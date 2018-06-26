@@ -1,29 +1,23 @@
 // Ionic Starter App
 
-// angular.module is a global place for creating, registering and retrieving Angular modules
-// 'starter' is the name of this angular module example (also set in a <body> attribute in index.html)
-// the 2nd parameter is an array of 'requires'
 var app = angular.module('starter', ['ionic','ngCordova']);
 
 app.controller('MapCtrl',MapCtrl);
 
-function MapCtrl ($rootScope, $scope, $state, $cordovaGeolocation,$cordovaLocalNotification, $ionicLoading,$ionicPlatform) {
+function MapCtrl ($rootScope, $scope, $state,$interval, $cordovaGeolocation,$cordovaLocalNotification, $ionicLoading,$ionicPlatform) {
 
   var vm = this;
   var start_coordinate = [];
   var end_coordinate = [];
+  var lat = 27 ,lng = 70;
   var options = {timeout: 10000, enableHighAccuracy: true};
-  vm.lat = 0;
-  vm.lng = 0;
-  var latLng = new google.maps.LatLng(vm.lat, vm.lng );
-  var mapOptions = {
+  var latLng = new google.maps.LatLng(lat, lng );
+  vm.mapOptions = {
     center: latLng,
-    zoom: 20,
+    zoom: 15,
     mapTypeId: google.maps.MapTypeId.ROADMAP
   };
 
-  vm.map = new google.maps.Map(document.getElementById("map"), mapOptions);
-  var markers = [];
   vm.startJourney = function () {
     getLocation("start");
     sendNotifications();
@@ -33,71 +27,106 @@ function MapCtrl ($rootScope, $scope, $state, $cordovaGeolocation,$cordovaLocalN
     getLocation("end");
   };
 
+  var setStartLocation = function (state) {
+    lat = localStorage.getItem('start_coord_lat');
+    lng = localStorage.getItem('start_coord_lng');
+    latLng = new google.maps.LatLng(lat ,lng);
+    vm.mapOptions = {
+      center: latLng,
+      zoom: 15,
+      mapTypeId: google.maps.MapTypeId.ROADMAP
+    };
+    vm.map = new google.maps.Map(document.getElementById("map"), vm.mapOptions);
+    google.maps.event.addListenerOnce(vm.map, 'idle', function() {
+      var marker = new google.maps.Marker({
+        map: vm.map,
+        animation: google.maps.Animation.DROP,
+        position: latLng
+      });
+      var geocoder = new google.maps.Geocoder;
+      var infoWindow = new google.maps.InfoWindow;
+      geocodeLatLng($scope, geocoder, lat, lng, infoWindow, marker, start);
+    });
+  };
   var getLocation = function(state){
     $cordovaGeolocation.getCurrentPosition(options).then(function(position){
-      if(state === 'start'){
+
+      if(state === 'start') {
         start_coordinate = position;
-        console.log(start_coordinate);
-      }else{
+        console.log(position.coords.latitude);
+        localStorage.setItem("start_coord_lat",position.coords.latitude);
+        localStorage.setItem("start_coord_lng",position.coords.longitude);
+      } else {
         end_coordinate = position;
       }
-      vm.lat =  position.coords.latitude;
-      vm.lng = position.coords.longitude;
-      latLng = new google.maps.LatLng(vm.lat, vm.lng );
-      mapOptions = {
+
+      lat =  position.coords.latitude;
+      lng = position.coords.longitude;
+      latLng = new google.maps.LatLng(lat, lng );
+
+      vm.mapOptions = {
         center: latLng,
-        zoom: 20,
+        zoom: 15,
         mapTypeId: google.maps.MapTypeId.ROADMAP
       };
 
-      vm.map = new google.maps.Map(document.getElementById("map"), mapOptions);
-
+      vm.map = new google.maps.Map(document.getElementById("map"), vm.mapOptions);
       google.maps.event.addListenerOnce(vm.map, 'idle', function(){
-
         var marker = new google.maps.Marker({
           map: vm.map,
           animation: google.maps.Animation.DROP,
           position: latLng
         });
-
         var geocoder = new google.maps.Geocoder;
         var infoWindow = new google.maps.InfoWindow;
-        geocodeLatLng($scope,geocoder,vm.lat,vm.lng, infoWindow, marker,state);
+        geocodeLatLng($scope,geocoder,lat,lng, infoWindow, marker,state);
       });
+
     }, function(error){
       console.log("Could not get location");
     });
   };
-  function geocodeLatLng($scope, geocoder, latitude, longitude,infoWindow,marker, state) {
+
+
+  function geocodeLatLng($scope, geocoder, latitude, longitude, infoWindow, marker, state) {
     var latlng = {lat: latitude, lng: longitude};
     geocoder.geocode({'location': latlng}, function(results, status) {
       if (status === 'OK') {
+
         if (results[0]) {
           infoWindow.setContent(results[0].formatted_address);
           infoWindow.open(map, marker);
           var distance = -1;
-          if(state === 'start'){
-            var address1 = document.getElementById("st_address");
-            address1.innerText = results[0].formatted_address;
-          }
-          else{
-            var address2 = document.getElementById("en_address");
-            address2.innerText = results[0].formatted_address;
+
+          if (state === 'start') {
+            vm.st_journey = results[0].formatted_address;
+            $scope.$apply();
+          } else if (state === 'end') {
+            vm.en_journey = results[0].formatted_address;
+            $scope.$apply();
             console.log(start_coordinate);
             console.log(end_coordinate);
-            var s_latLng = new google.maps.LatLng(start_coordinate.coords.latitude,start_coordinate.coords.longitude );
+            if(start_coordinate !== null) {
+              var s_latLng = new google.maps.LatLng(start_coordinate.coords.latitude,start_coordinate.coords.longitude );
+            } else {
+              var s_latLng = new google.maps.LatLng
+            }
+
             var e_latLng = new google.maps.LatLng(end_coordinate.coords.latitude,end_coordinate.coords.longitude );
-            console.log(distance = getDistance(s_latLng,e_latLng));
+            getDistance(s_latLng,e_latLng);
           }
-          vm.distance = "To be calculated";
+
         } else {
           window.alert('No results found');
         }
+
       } else {
         window.alert('Geocoder failed due to: ' + status);
       }
     });
   }
+
+
   var sendNotifications = function(){
     $cordovaLocalNotification.schedule({
       id: 1,
@@ -111,6 +140,8 @@ function MapCtrl ($rootScope, $scope, $state, $cordovaGeolocation,$cordovaLocalN
     });
   };
 
+
+  //Code to calculate the distance between two points ---------------------------
   var rad = function(x) {
     return x * Math.PI / 180;
   };
@@ -124,26 +155,32 @@ function MapCtrl ($rootScope, $scope, $state, $cordovaGeolocation,$cordovaLocalN
       Math.sin(dLong / 2) * Math.sin(dLong / 2);
     var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     var d = R * c;
-    return d; // returns the distance in meter
+    vm.distance = d;
+    console.log(vm.distance);
+    $scope.$apply();
   };
+  // ------------------------------------------------------------------------------
 
   $rootScope.$on('$cordovaLocalNotification:click',
     function (event, notification, state) {
-      // ...
-      // console.log(event);
-      // console.log(notification);
-      // console.log(state);
-      // console.log("hello world");
       vm.endJourney();
-    });
+  });
 
   var init = function() {
-    vm.distance = 0.0;
-    vm.map = new google.maps.Map(document.getElementById("map"), mapOptions);
+    vm.lat = 0;
+    vm.lng = 0;
+    vm.distance = -1;
+
+    if(localStorage.getItem("start_coord_lat") !== null && localStorage.getItem("start_coord_lat") !== ""){
+     setStartLocation();
+    }
+    else{
+      vm.map = new google.maps.Map(document.getElementById("map"), vm.mapOptions);
+    }
+
   };
   init();
 }
-
 
 app.run(function($ionicPlatform) {
   $ionicPlatform.ready(function() {
@@ -158,15 +195,5 @@ app.run(function($ionicPlatform) {
     if(window.StatusBar) {
       StatusBar.styleDefault();
     }
-    // window.plugin.notification.local.onadd = function (id, state, json) {
-    //   var notification = {
-    //     id: id,
-    //     state: state,
-    //     json: json
-    //   };
-    //   $timeout(function() {
-    //     $rootScope.$broadcast("$cordovaLocalNotification:added", notification);
-    //   });
-    // };
   });
 });

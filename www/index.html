@@ -32,21 +32,21 @@
       <ion-header-bar class="bar-stable">
         <h1 class="title">Ionic Blank Starter</h1>
       </ion-header-bar>
-      <ion-content ng-controller="MapCtrl as vm">
+      <ion-content ng-controller="MapCtrl as main">
         <div id="map" data-tap-disabled="true"></div>
         <br>
         <text>Press the buttons to Start/End journey</text>
         <br>
-        <button ng-click="vm.startJourney()">Start Journey</button>
+        <button ng-click="main.startJourney()">Start Journey</button>
         <br>
-        <span><span style="font-weight: bold; font-size: 20px">Start Location : </span><text id="st_address"></text></span>
+        <span><span style="font-weight: bold; font-size: 20px">Start Location : </span><text ng-bind="main.st_journey"></text></span>
         <br>
-        <button ng-click="vm.endJourney()">End Journey</button>
+        <button ng-click="main.endJourney()">End Journey</button>
         <br>
-        <span><span style="font-weight: bold; font-size: 20px">End Location : </span><text id="en_address"></text></span>
+        <span><span style="font-weight: bold; font-size: 20px">End Location : </span><text ng-bind="main.en_journey"></text></span>
         <br>
-        <span style="font-weight: bold; font-size: 20px">Distance : </span>
-        <text ng-bind="vm.distance"></text>
+        <span style="font-weight: bold; font-size: 20px">Distance : <text ng-bind="main.distance"></text> metres </span>
+
       </ion-content>
     </ion-pane>
     <!--<script src="https://maps-api-ssl.google.com/maps/api/js?libraries=places"></script>-->
